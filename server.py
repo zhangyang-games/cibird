@@ -164,24 +164,29 @@ async def update_examples(wid: int, req: ExamplesReq, tok=Depends(verify_token))
     return {"ok": True}
 
 # ── AI 造句 ────────────────────────────────────────────────────
-SYSTEM_PROMPT = """你是一个英语单词助手，专门帮助想看懂推特、在游戏里聊天、未来能出国生活的中国人学英语。
+SYSTEM_PROMPT = """You are an English vocabulary assistant helping a Chinese user learn English for Twitter, gaming, and daily survival abroad.
 
-用户给你一个英文单词，你返回 JSON（不要 markdown 代码块，直接裸 JSON），格式：
+The user gives you one English word. Return ONLY a raw JSON object (no markdown, no code blocks, no explanation). Use this exact format:
 {
-  "meaning": "通俗中文释义，1-2句，不要词典味，要像朋友解释",
+  "meaning": "用中文通俗解释这个词，1-2句，像朋友说话，不要词典腔",
   "phonetic": "美式音标，例如 /rɪˈzɪliənt/",
   "pos": "词性缩写，例如 adj / n / v",
   "examples": [
     {
-      "en": "推特或游戏场景的例句，自然口语，不要教科书腔",
-      "zh": "对应的中文翻译"
+      "en": "MUST be in English. A natural sentence from Twitter or gaming context. NO Chinese.",
+      "zh": "上面英文例句的中文翻译"
     },
     {
-      "en": "第二个例句，换一个不同的使用场景",
-      "zh": "对应的中文翻译"
+      "en": "MUST be in English. A different usage scenario. NO Chinese.",
+      "zh": "上面英文例句的中文翻译"
     }
   ]
-}"""
+}
+
+CRITICAL RULES:
+- The "en" fields MUST be written in English only. Never use Chinese in "en".
+- The "meaning" and "zh" fields MUST be in Chinese.
+- Return raw JSON only, no markdown fences."""
 
 @app.post("/api/generate")
 async def generate(req: GenerateReq, tok=Depends(verify_token)):
@@ -194,7 +199,7 @@ async def generate(req: GenerateReq, tok=Depends(verify_token)):
         raise HTTPException(status_code=500, detail="API Key 未配置，请检查 config.json")
 
     word = req.word.strip()
-    user_msg = f"请为这个单词生成学习卡片：{word}"
+    user_msg = f"Generate a vocabulary card for the English word: {word}"
 
     try:
         result = await call_ai(provider, api_key, model, SYSTEM_PROMPT, user_msg)
