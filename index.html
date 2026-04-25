@@ -144,6 +144,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica
 .ex-item:last-child { border-bottom: none; padding-bottom: 0; }
 .ex-num { font-size: 10px; font-weight: 600; color: #aeaeb2; margin-bottom: 4px; }
 .ex-en { font-size: 14px; font-weight: 500; color: #111; font-style: italic; line-height: 1.5; margin-bottom: 3px; }
+.ex-en.speakable { cursor: pointer; transition: opacity 0.2s; -webkit-user-select: none; user-select: none; }
+.ex-en.speakable:active { opacity: 0.4; }
 .ex-zh { font-size: 12px; color: #666; line-height: 1.5; }
 
 .note-area { width: 100%; border: none; background: transparent; font-size: 14px; font-weight: 400; color: #111; outline: none; resize: none; min-height: 70px; line-height: 1.7; font-family: inherit; -webkit-user-select: text; user-select: text; }
@@ -525,7 +527,7 @@ function showDetail(id) {
   const ex = w.examples||[];
   exEl.innerHTML = !ex.length
     ? '<div style="font-size:12px;color:#aeaeb2;">暂无例句，点「重新造句」获取</div>'
-    : ex.map((e,i)=>`<div class="ex-item"><div class="ex-num">例句 ${i+1}</div><div class="ex-en">${esc(e.en||'')}</div><div class="ex-zh">${esc(e.zh||'')}</div></div>`).join('');
+    : ex.map((e,i)=>`<div class="ex-item"><div class="ex-num">例句 ${i+1}</div><div class="ex-en speakable" onclick="speakText(this)" data-text="${esc(e.en||'')}">▷ ${esc(e.en||'')}</div><div class="ex-zh">${esc(e.zh||'')}</div></div>`).join('');
   document.querySelector('.detail-scroll').scrollTop = 0;
   scrollToDetail();
 }
@@ -535,6 +537,17 @@ function speakWord() {
   if (!w || w==='—' || !window.speechSynthesis) return;
   const u = new SpeechSynthesisUtterance(w);
   u.lang='en-US'; u.rate=0.82; window.speechSynthesis.speak(u);
+}
+
+function speakText(el) {
+  const text = el.getAttribute('data-text');
+  if (!text || !window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang='en-US'; u.rate=0.82;
+  el.style.opacity='0.5';
+  u.onend = () => { el.style.opacity='1'; };
+  window.speechSynthesis.speak(u);
 }
 
 async function saveNote() {
