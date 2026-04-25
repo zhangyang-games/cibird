@@ -78,6 +78,13 @@ body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica
 .search-wrap input { flex: 1; border: none; background: transparent; outline: none; font-size: 13px; color: #111; font-family: inherit; font-weight: 500; -webkit-user-select: text; user-select: text; }
 .search-wrap input::placeholder { color: #aeaeb2; font-weight: 400; }
 
+/* 字母导航 */
+.alpha-nav { display: flex; flex-wrap: wrap; gap: 4px 2px; margin-bottom: 12px; flex-shrink: 0; }
+.alpha-nav span { font-size: 11px; font-weight: 700; color: #aeaeb2; background: none; border: none; padding: 4px 5px; border-radius: 6px; cursor: pointer; transition: all 0.15s; letter-spacing: 0.3px; line-height: 1; -webkit-user-select: none; }
+.alpha-nav span:active { transform: scale(0.88); }
+.alpha-nav span.active { background: #1c1c1e; color: #fff; }
+.alpha-nav .alpha-all { font-size: 10px; letter-spacing: 0.3px; }
+
 .word-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-bottom: 90px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
 .word-list::-webkit-scrollbar { display: none; }
 
@@ -252,8 +259,12 @@ textarea.t-input { resize: none; min-height: 68px; line-height: 1.6; }
           <button class="logout-btn" onclick="doLogout()">退出</button>
         </div>
       </div>
+      <div class="alpha-nav" id="alpha-nav">
+        <span class="alpha-all active" onclick="filterAlpha(null,this)">ALL</span>
+        <span onclick="filterAlpha('A',this)">A</span><span onclick="filterAlpha('B',this)">B</span><span onclick="filterAlpha('C',this)">C</span><span onclick="filterAlpha('D',this)">D</span><span onclick="filterAlpha('E',this)">E</span><span onclick="filterAlpha('F',this)">F</span><span onclick="filterAlpha('G',this)">G</span><span onclick="filterAlpha('H',this)">H</span><span onclick="filterAlpha('I',this)">I</span><span onclick="filterAlpha('J',this)">J</span><span onclick="filterAlpha('K',this)">K</span><span onclick="filterAlpha('L',this)">L</span><span onclick="filterAlpha('M',this)">M</span><span onclick="filterAlpha('N',this)">N</span><span onclick="filterAlpha('O',this)">O</span><span onclick="filterAlpha('P',this)">P</span><span onclick="filterAlpha('Q',this)">Q</span><span onclick="filterAlpha('R',this)">R</span><span onclick="filterAlpha('S',this)">S</span><span onclick="filterAlpha('T',this)">T</span><span onclick="filterAlpha('U',this)">U</span><span onclick="filterAlpha('V',this)">V</span><span onclick="filterAlpha('W',this)">W</span><span onclick="filterAlpha('X',this)">X</span><span onclick="filterAlpha('Y',this)">Y</span><span onclick="filterAlpha('Z',this)">Z</span>
+      </div>
       <div class="search-wrap">
-        <input type="text" placeholder="搜索单词或释义…" id="search-input" oninput="filterWords()">
+        <input type="text" placeholder="搜索单词或释义…" id="search-input" oninput="onSearchInput()">
       </div>
       <div class="word-list" id="word-list"></div>
       <button class="fab" onclick="openAdd()">
@@ -465,9 +476,36 @@ function renderList(list) {
   `).join('');
 }
 
-function filterWords() {
+let currentAlpha = null;
+
+function filterAlpha(letter, el) {
+  currentAlpha = letter;
+  // 高亮选中字母
+  document.querySelectorAll('.alpha-nav span').forEach(s => s.classList.remove('active'));
+  el.classList.add('active');
+  // 清空搜索框
+  document.getElementById('search-input').value = '';
+  applyFilter();
+}
+
+function onSearchInput() {
+  // 搜索时取消字母筛选
+  currentAlpha = null;
+  document.querySelectorAll('.alpha-nav span').forEach(s => s.classList.remove('active'));
+  document.querySelector('.alpha-all').classList.add('active');
+  applyFilter();
+}
+
+function applyFilter() {
   const q = document.getElementById('search-input').value.toLowerCase().trim();
-  renderList(!q ? words : words.filter(w => w.word.toLowerCase().includes(q)||(w.meaning||'').toLowerCase().includes(q)||(w.note||'').toLowerCase().includes(q)));
+  let result = words;
+  if (currentAlpha) {
+    result = result.filter(w => w.word.toUpperCase().startsWith(currentAlpha));
+  }
+  if (q) {
+    result = result.filter(w => w.word.toLowerCase().includes(q)||(w.meaning||'').toLowerCase().includes(q)||(w.note||'').toLowerCase().includes(q));
+  }
+  renderList(result);
 }
 
 function updateBadge() { document.getElementById('wc-badge').textContent = words.length + ' 词'; }
