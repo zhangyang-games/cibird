@@ -59,6 +59,48 @@ body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue"
 .nav-dot{width:6px;height:6px;border-radius:50%;background:#d1d1d6;transition:all .25s;}
 .nav-dot.on{background:#111;width:18px;border-radius:3px;}
 
+/* 桌面左右箭头 */
+.nav-arrow{position:absolute;top:50%;transform:translateY(-50%);z-index:200;width:36px;height:36px;background:rgba(255,255,255,.92);border:1px solid #e5e5ea;border-radius:50%;display:none;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 2px 12px rgba(0,0,0,.1);transition:all .2s;backdrop-filter:blur(8px);}
+.nav-arrow:hover{background:#fff;box-shadow:0 4px 16px rgba(0,0,0,.15);transform:translateY(-50%) scale(1.05);}
+.nav-arrow:active{transform:translateY(-50%) scale(.95);}
+.nav-arrow.left{left:-18px;}
+.nav-arrow.right{right:-18px;}
+.nav-arrow svg{width:14px;height:14px;stroke:#333;stroke-width:2.5;fill:none;stroke-linecap:round;stroke-linejoin:round;}
+@media(hover:hover) and (pointer:fine){.nav-arrow{display:flex;}}
+
+/* 时间/数字工具面板 */
+.tool-wrap{flex:1;display:flex;flex-direction:column;overflow:hidden;padding:0 20px;}
+.tool-tabs{display:flex;gap:8px;margin-bottom:16px;flex-shrink:0;}
+.tool-tab{flex:1;background:#fff;border:1px solid #e5e5ea;border-radius:12px;padding:10px;text-align:center;font-size:13px;font-weight:600;color:#8e8e93;cursor:pointer;transition:all .2s;}
+.tool-tab.on{background:#1c1c1e;color:#fff;border-color:#1c1c1e;}
+.tool-tab:active{transform:scale(.97);}
+.picker-area{background:#fff;border-radius:20px;border:1px solid #e5e5ea;overflow:hidden;flex-shrink:0;position:relative;}
+.picker-row{display:flex;align-items:center;height:200px;position:relative;}
+.picker-col{flex:1;height:200px;overflow-y:auto;scroll-snap-type:y mandatory;scrollbar-width:none;position:relative;}
+.picker-col::-webkit-scrollbar{display:none;}
+.picker-item{height:40px;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:600;color:#c7c7cc;scroll-snap-align:center;transition:color .15s,font-size .15s;-webkit-user-select:none;}
+.picker-item.sel{color:#111;font-size:26px;}
+.picker-sep{font-size:28px;font-weight:700;color:#ddd;padding:0 4px;flex-shrink:0;}
+.picker-area::before,.picker-area::after{content:"";position:absolute;left:0;right:0;height:72px;z-index:10;pointer-events:none;}
+.picker-area::before{top:0;background:linear-gradient(to bottom,#fff 0%,rgba(255,255,255,0) 100%);}
+.picker-area::after{bottom:0;background:linear-gradient(to top,#fff 0%,rgba(255,255,255,0) 100%);}
+.picker-line{position:absolute;left:16px;right:16px;top:50%;transform:translateY(-50%);height:40px;border-top:1px solid #e5e5ea;border-bottom:1px solid #e5e5ea;z-index:5;pointer-events:none;}
+.result-card{background:#1c1c1e;border-radius:20px;padding:18px 20px;margin-top:14px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;transition:transform .15s;flex-shrink:0;}
+.result-card:active{transform:scale(.98);}
+.result-left{flex:1;}
+.result-en{font-size:17px;font-weight:700;color:#fff;line-height:1.5;}
+.result-zh{font-size:12px;color:#666;margin-top:4px;}
+.result-speak{width:40px;height:40px;background:rgba(255,255,255,.08);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;margin-left:12px;}
+.num-input-wrap{background:#fff;border:2px solid #e5e5ea;border-radius:16px;display:flex;align-items:center;padding:0 16px;height:64px;transition:border-color .2s,box-shadow .2s;flex-shrink:0;}
+.num-input-wrap:focus-within{border-color:#111;box-shadow:0 0 0 3px rgba(0,0,0,.05);}
+.num-input{flex:1;border:none;background:transparent;font-size:28px;font-weight:700;color:#111;outline:none;font-family:inherit;-webkit-user-select:text;user-select:text;text-align:center;}
+.num-input::placeholder{color:#d1d1d6;font-weight:400;font-size:22px;}
+.num-clear{font-size:20px;color:#c7c7cc;cursor:pointer;padding:4px;}
+.num-clear:active{color:#111;}
+.num-examples{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;flex-shrink:0;}
+.num-eg{background:#fff;border:1px solid #e5e5ea;border-radius:999px;padding:6px 14px;font-size:12px;font-weight:600;color:#555;cursor:pointer;transition:all .2s;-webkit-user-select:none;}
+.num-eg:active{background:#1c1c1e;color:#fff;border-color:#1c1c1e;}
+
 /* ── 通用面板头 ─────────────────────────────────────────── */
 .phead{display:flex;align-items:center;justify-content:space-between;padding:max(18px,env(safe-area-inset-top)) 20px 10px 20px;flex-shrink:0;}
 .phead-title{font-size:22px;font-weight:700;color:#111;letter-spacing:.2px;}
@@ -354,19 +396,77 @@ textarea.ti{resize:none;min-height:68px;line-height:1.6;}
       </button>
     </div>
 
-    <!-- ─── PANEL 3: 必学 ─── -->
+    <!-- ─── PANEL 3: 时间 & 数字 ─── -->
     <div class="panel" id="pEssential">
       <div class="phead">
-        <div class="phead-title">必学</div>
-        <div class="phead-right">
-          <span class="badge">AI生成</span>
+        <div class="phead-title">练习</div>
+        <div class="phead-right"><span class="badge">互动</span></div>
+      </div>
+      <div class="tool-wrap">
+        <!-- Tab 切换 -->
+        <div class="tool-tabs">
+          <div class="tool-tab on" id="tabTime" onclick="switchTool('time')">🕐 时间</div>
+          <div class="tool-tab" id="tabNum" onclick="switchTool('num')">🔢 数字</div>
+        </div>
+
+        <!-- 时间工具 -->
+        <div id="toolTime">
+          <div class="picker-area">
+            <div class="picker-line"></div>
+            <div class="picker-row">
+              <!-- 小时列 -->
+              <div class="picker-col" id="pcHour"></div>
+              <div class="picker-sep">:</div>
+              <!-- 分钟列 -->
+              <div class="picker-col" id="pcMin"></div>
+              <div class="picker-sep" style="font-size:14px;color:#aeaeb2;writing-mode:vertical-lr;transform:rotate(180deg);padding:0 8px;"></div>
+              <!-- AM/PM -->
+              <div class="picker-col" id="pcAmpm" style="max-width:70px;"></div>
+            </div>
+          </div>
+          <div class="result-card" onclick="speakResult('time')" id="timeResult">
+            <div class="result-left">
+              <div class="result-en" id="timeEn">选择时间后自动生成</div>
+              <div class="result-zh" id="timeZh"></div>
+            </div>
+            <div class="result-speak">🔊</div>
+          </div>
+        </div>
+
+        <!-- 数字工具 -->
+        <div id="toolNum" style="display:none">
+          <div class="num-input-wrap">
+            <input class="num-input" type="number" id="numIn" placeholder="输入数字…" oninput="onNumInput()" inputmode="numeric">
+            <div class="num-clear" onclick="clearNum()">✕</div>
+          </div>
+          <div class="num-examples">
+            <div class="num-eg" onclick="setNum(42)">42</div>
+            <div class="num-eg" onclick="setNum(100)">100</div>
+            <div class="num-eg" onclick="setNum(365)">365</div>
+            <div class="num-eg" onclick="setNum(1024)">1,024</div>
+            <div class="num-eg" onclick="setNum(99999)">99,999</div>
+            <div class="num-eg" onclick="setNum(1000000)">1M</div>
+          </div>
+          <div class="result-card" onclick="speakResult('num')" id="numResult" style="display:none">
+            <div class="result-left">
+              <div class="result-en" id="numEn"></div>
+              <div class="result-zh" id="numZh"></div>
+            </div>
+            <div class="result-speak">🔊</div>
+          </div>
         </div>
       </div>
-      <div class="cat-track" id="catTrack"></div>
-      <div class="ess-list" id="essList"></div>
     </div>
 
   </div><!-- /h-track -->
+
+  <!-- 桌面导航箭头 -->
+  <button class="nav-arrow left" id="arrowL" onclick="arrowNav(-1)">
+    <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+  </button>
+  <button class="nav-arrow right" id="arrowR" onclick="arrowNav(1)">
+    <svg viewBox="0 0 24 24"><polyline points="9 6 15 12 9 18"/></svg>
+  </button>
 
   <!-- 底部导航点 -->
   <div class="nav-dots">
@@ -755,48 +855,189 @@ async function saveWord(){
 document.getElementById('addSheet').addEventListener('click',e=>{if(e.target===document.getElementById('addSheet'))closeAdd();});
 
 // ═══════════════════════════
-// ESSENTIALS
+// PANEL NAV ARROWS (desktop)
 // ═══════════════════════════
-const CATS=['时间','数字','日期','十二个月','问候','情绪','游戏','推特'];
+let curPanel=1;
+function arrowNav(dir){
+  curPanel=Math.max(0,Math.min(2,curPanel+dir));
+  goPanel(curPanel);
+  updateArrows();
+}
+function updateArrows(){
+  const l=document.getElementById('arrowL');
+  const r=document.getElementById('arrowR');
+  if(l){l.style.opacity=curPanel===0?'0.3':'1';l.style.pointerEvents=curPanel===0?'none':'auto';}
+  if(r){r.style.opacity=curPanel===2?'0.3':'1';r.style.pointerEvents=curPanel===2?'none':'auto';}
+}
+// 覆盖 enterApp 后调用
+const _origGoPanel=goPanel;
 
-async function loadCategories(){
-  const track=document.getElementById('catTrack');
-  track.innerHTML=CATS.map((c,i)=>`<div class="cat-tab${i===0?' on':''}" onclick="loadEssential('${c}',this)">${c}</div>`).join('');
-  loadEssential(CATS[0],track.querySelector('.cat-tab'));
+// ═══════════════════════════
+// TOOL: 时间 & 数字
+// ═══════════════════════════
+function initTools(){
+  buildPicker('pcHour', Array.from({length:12},(_,i)=>String(i+1).padStart(2,'0')), 0);
+  buildPicker('pcMin',  Array.from({length:60},(_,i)=>String(i).padStart(2,'0')), 0);
+  buildPicker('pcAmpm', ['AM','PM'], 0);
+  updateTimeResult();
 }
 
-async function loadEssential(cat,el){
-  curCat=cat;
-  document.querySelectorAll('.cat-tab').forEach(t=>t.classList.remove('on'));
-  el.classList.add('on');
-  const list=document.getElementById('essList');
-  list.innerHTML='<div class="ess-loading"><div class="mini-spin"></div>AI 生成中…</div>';
-  try{
-    const r=await fetch('/api/essentials/'+encodeURIComponent(cat),{headers:ah()});
-    if(!r.ok){list.innerHTML='<div class="ess-loading">加载失败，请重试</div>';return;}
-    const d=await r.json();
-    const items=d.items||[];
-    if(!items.length){list.innerHTML='<div class="ess-loading">暂无内容</div>';return;}
-    list.innerHTML=items.map((item,i)=>`
-      <div class="ess-card" style="animation-delay:${i*.04}s">
-        <div class="ess-left">
-          <div class="ess-en">${esc(item.en||'')}</div>
-          <div class="ess-zh">${esc(item.zh||'')}</div>
-        </div>
-        <div class="ess-right">
-          ${item.note?`<span class="ess-note">${esc(item.note)}</span>`:''}
-          <span class="ess-speak" onclick="speakEss(event,'${esc(item.en||'')}')">🔊</span>
-        </div>
-      </div>`).join('');
-  }catch(e){list.innerHTML='<div class="ess-loading">网络错误</div>';}
+function buildPicker(colId, items, initIdx){
+  const col=document.getElementById(colId);
+  if(!col)return;
+  // 上下各加3个空白撑高，让选中项能居中
+  const pad=3;
+  let html='';
+  for(let i=0;i<pad;i++) html+=`<div class="picker-item" style="visibility:hidden">&nbsp;</div>`;
+  items.forEach((v,i)=>{ html+=`<div class="picker-item" data-val="${v}">${v}</div>`; });
+  for(let i=0;i<pad;i++) html+=`<div class="picker-item" style="visibility:hidden">&nbsp;</div>`;
+  col.innerHTML=html;
+
+  // 滚到初始位置
+  col.scrollTop=initIdx*40;
+  highlightPicker(col);
+
+  // 滚动时更新高亮 + 结果
+  col.addEventListener('scroll',()=>{
+    highlightPicker(col);
+    if(colId==='pcHour'||colId==='pcMin'||colId==='pcAmpm') updateTimeResult();
+  },{passive:true});
 }
 
-function speakEss(e,text){
-  e.stopPropagation();
+function highlightPicker(col){
+  const items=[...col.querySelectorAll('.picker-item[data-val]')];
+  const center=col.scrollTop+col.offsetHeight/2;
+  let best=null, bestDist=Infinity;
+  items.forEach(item=>{
+    const dist=Math.abs(item.offsetTop+20-center);
+    if(dist<bestDist){bestDist=dist;best=item;}
+  });
+  items.forEach(i=>i.classList.remove('sel'));
+  if(best) best.classList.add('sel');
+}
+
+function getPickerVal(colId){
+  const col=document.getElementById(colId);
+  if(!col)return null;
+  return col.querySelector('.picker-item.sel')?.getAttribute('data-val')||null;
+}
+
+function updateTimeResult(){
+  const h=getPickerVal('pcHour');
+  const m=getPickerVal('pcMin');
+  const ap=getPickerVal('pcAmpm');
+  if(!h||!m||!ap)return;
+  const hNum=parseInt(h);
+  const mNum=parseInt(m);
+  const {en,zh}=timeToEnglish(hNum,mNum,ap);
+  document.getElementById('timeEn').textContent=en;
+  document.getElementById('timeZh').textContent=zh;
+}
+
+function timeToEnglish(h,m,ap){
+  const ones=['','one','two','three','four','five','six','seven','eight','nine',
+              'ten','eleven','twelve','thirteen','fourteen','fifteen',
+              'sixteen','seventeen','eighteen','nineteen'];
+  const tens=['','','twenty','thirty','forty','fifty'];
+  function sayNum(n){
+    if(n===0)return'';
+    if(n<20)return ones[n];
+    return tens[Math.floor(n/10)]+(n%10?'-'+ones[n%10]:'');
+  }
+  const hWord=ones[h]||sayNum(h);
+  const apWord=ap.toLowerCase();
+
+  let en='',zh='';
+
+  if(m===0){
+    en=`It's ${hWord} o'clock ${apWord}.`;
+    zh=`现在是${ap==='AM'?'上午':'下午'}${h}点整`;
+  } else if(m===15){
+    en=`It's a quarter past ${hWord} ${apWord}.`;
+    zh=`现在是${ap==='AM'?'上午':'下午'}${h}点一刻`;
+  } else if(m===30){
+    en=`It's half past ${hWord} ${apWord}.`;
+    zh=`现在是${ap==='AM'?'上午':'下午'}${h}点半`;
+  } else if(m===45){
+    const nextH=h===12?1:h+1;
+    en=`It's a quarter to ${ones[nextH]||sayNum(nextH)} ${apWord}.`;
+    zh=`现在差一刻${ap==='AM'?'上午':'下午'}${nextH}点`;
+  } else if(m<30){
+    en=`It's ${sayNum(m)} past ${hWord} ${apWord}.`;
+    zh=`现在是${ap==='AM'?'上午':'下午'}${h}点过${m}分`;
+  } else {
+    const left=60-m;
+    const nextH=h===12?1:h+1;
+    en=`It's ${sayNum(left)} to ${ones[nextH]||sayNum(nextH)} ${apWord}.`;
+    zh=`现在差${left}分${ap==='AM'?'上午':'下午'}${nextH}点`;
+  }
+  // 首字母大写已有 It's
+  return {en,zh};
+}
+
+function speakResult(type){
+  let text='';
+  if(type==='time') text=document.getElementById('timeEn').textContent;
+  if(type==='num') text=document.getElementById('numEn').textContent;
   if(!text||!window.speechSynthesis)return;
   window.speechSynthesis.cancel();
-  const u=new SpeechSynthesisUtterance(text);u.lang='en-US';u.rate=.82;window.speechSynthesis.speak(u);
+  const u=new SpeechSynthesisUtterance(text);u.lang='en-US';u.rate=.78;window.speechSynthesis.speak(u);
 }
+
+function switchTool(t){
+  document.getElementById('toolTime').style.display=t==='time'?'block':'none';
+  document.getElementById('toolNum').style.display=t==='num'?'block':'none';
+  document.getElementById('tabTime').classList.toggle('on',t==='time');
+  document.getElementById('tabNum').classList.toggle('on',t==='num');
+}
+
+// 数字转英文
+function numToWords(n){
+  if(isNaN(n))return'';
+  if(n===0)return'zero';
+  if(n<0)return'negative '+numToWords(-n);
+  const ones=['','one','two','three','four','five','six','seven','eight','nine',
+              'ten','eleven','twelve','thirteen','fourteen','fifteen',
+              'sixteen','seventeen','eighteen','nineteen'];
+  const tens=['','','twenty','thirty','forty','fifty','sixty','seventy','eighty','ninety'];
+  function say(num){
+    if(num===0)return'';
+    if(num<20)return ones[num]+' ';
+    if(num<100)return tens[Math.floor(num/10)]+(num%10?'-'+ones[num%10]:'')+' ';
+    if(num<1000)return ones[Math.floor(num/100)]+' hundred '+(num%100?say(num%100):'');
+    if(num<1000000)return say(Math.floor(num/1000))+'thousand '+(num%1000?say(num%1000):'');
+    if(num<1000000000)return say(Math.floor(num/1000000))+'million '+(num%1000000?say(num%1000000):'');
+    return say(Math.floor(num/1000000000))+'billion '+(num%1000000000?say(num%1000000000):'');
+  }
+  return say(Math.floor(Math.abs(n))).trim().replace(/\s+/g,' ');
+}
+
+function onNumInput(){
+  const val=document.getElementById('numIn').value.trim();
+  const n=parseInt(val);
+  const card=document.getElementById('numResult');
+  if(!val||isNaN(n)||n<0||n>999999999){
+    card.style.display='none';return;
+  }
+  const words=numToWords(n);
+  // 首字母大写
+  const en=words.charAt(0).toUpperCase()+words.slice(1);
+  document.getElementById('numEn').textContent=en;
+  document.getElementById('numZh').textContent='数字 '+n.toLocaleString()+' 的英文读法';
+  card.style.display='flex';
+}
+
+function setNum(n){
+  document.getElementById('numIn').value=n;
+  onNumInput();
+}
+function clearNum(){
+  document.getElementById('numIn').value='';
+  document.getElementById('numResult').style.display='none';
+}
+
+// 旧接口兼容（enterApp 里调用）
+function loadCategories(){ initTools(); }
 
 // ═══════════════════════════
 // UTILS
@@ -804,6 +1045,18 @@ function speakEss(e,text){
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 let tt;
 function showToast(msg){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('on');clearTimeout(tt);tt=setTimeout(()=>el.classList.remove('on'),2200);}
+
+// track scroll → 更新箭头方向
+document.addEventListener('DOMContentLoaded',()=>{
+  const track=document.getElementById('hTrack');
+  if(track){
+    track.addEventListener('scroll',()=>{
+      curPanel=Math.round(track.scrollLeft/track.offsetWidth);
+      updateArrows();
+    },{passive:true});
+  }
+  updateArrows();
+});
 </script>
 </body>
 </html>
