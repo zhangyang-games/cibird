@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#f5f5f7">
+<title>CiBird | 词鸟</title>
+<style>
+/* ── RESET & BASE ─────────────────────────────────────────── */
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;outline:none;-webkit-touch-callout:none;margin:0;padding:0;}
+html,body{position:fixed;inset:0;width:100%;height:100%;}
+body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Arial,sans-serif;background:#e5e5ea;display:flex;justify-content:center;align-items:center;overflow:hidden;overscroll-behavior:none;-webkit-user-select:none;user-select:none;}
+
+.frame{width:100%;max-width:400px;height:100%;background:#f5f5f7;position:relative;overflow:hidden;display:none;flex-direction:column;}
+.frame.on{display:flex;}
+
+/* Header / Tabs / List Styles (simplified for output) */
+.header{padding:16px;background:#fff;border-bottom:1px solid #e5e5e5;display:flex;justify-content:space-between;align-items:center;}
+.nav{height:60px;background:#fff;border-top:1px solid #e5e5e5;display:flex;padding-bottom:env(safe-area-inset-bottom);}
+.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:10px;color:#8e8e93;}
+.nav-item.on{color:#007aff;}
+.content{flex:1;overflow-y:auto;padding:12px;-webkit-overflow-scrolling:touch;}
+
+/* Tool Specific */
+.tool-tabs{display:flex;gap:8px;margin-bottom:16px;}
+.tool-tab{padding:8px 16px;background:#e5e5ea;border-radius:18px;font-size:14px;color:#3a3a3c;transition:0.2s;}
+.tool-tab.on{background:#007aff;color:#fff;}
+.ess-card{background:#fff;border-radius:12px;padding:12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 1px 3px rgba(0,0,0,0.05);}
+.ess-en{font-weight:600;font-size:16px;margin-bottom:2px;}
+.ess-zh{font-size:13px;color:#8e8e93;}
+.ess-note{font-size:12px;color:#aeaeb2;margin-right:8px;}
+.ess-loading{text-align:center;padding:40px;color:#8e8e93;}
+
+/* ... Rest of your existing CSS (I'm assuming you keep it) ... */
+/* NOTE: Below is a minimal representation of the index.html with the added logic */
+</style>
+</head>
+<body>
+<!-- Login Frame -->
+<div class="frame on" id="frameLogin">
+  <div style="padding:40px 20px;text-align:center;">
+    <h1 style="font-size:32px;margin-bottom:10px;">🦜 CiBird</h1>
+    <p style="color:#8e8e93;margin-bottom:40px;">你的私人词库</p>
+    <input type="password" id="loginPw" placeholder="输入密码..." style="width:100%;padding:15px;border-radius:12px;border:none;background:#fff;margin-bottom:12px;font-size:16px;">
+    <button onclick="doLogin()" style="width:100%;padding:15px;border-radius:12px;border:none;background:#007aff;color:#fff;font-size:16px;font-weight:600;">进入</button>
+  </div>
+</div>
+
+<!-- Main Frame -->
+<div class="frame" id="frameMain">
+  <div class="header">
+    <span id="headerTitle" style="font-size:20px;font-weight:700;">我的词库</span>
+    <span onclick="showAdd()" id="addIcon" style="font-size:24px;cursor:pointer;">⊕</span>
+  </div>
+  
+  <div class="content" id="mainContent">
+    <!-- 动态内容 -->
+  </div>
+
+  <div class="nav">
+    <div class="nav-item on" onclick="go('words')">📖 词库</div>
+    <div class="nav-item" onclick="go('ess')">✦ 必学</div>
+    <div class="nav-item" onclick="go('tools')">🛠️ 练习</div>
+    <div class="nav-item" onclick="go('stats')">📈 统计</div>
+  </div>
+</div>
+
+<script>
+let API_TOKEN = localStorage.getItem('cibird_token');
+const ah = () => ({ 'Authorization': 'Bearer ' + API_TOKEN, 'Content-Type': 'application/json' });
+
+async function doLogin(){
+  const pw = document.getElementById('loginPw').value;
+  const r = await fetch('/api/login', {method:'POST', body:JSON.stringify({password:pw}), headers:{'Content-Type':'application/json'}});
+  if(r.ok){
+    const d = await r.json();
+    API_TOKEN = d.token; localStorage.setItem('cibird_token', d.token);
+    enterApp();
+  } else { alert('密码不对哦'); }
+}
+
+function enterApp(){
+  document.getElementById('frameLogin').classList.remove('on');
+  document.getElementById('frameMain').classList.add('on');
+  go('words');
+}
+
+function go(page){
+  const titles = {words:'我的词库', ess:'必学模块', tools:'练习工具', stats:'我的进度'};
+  document.getElementById('headerTitle').textContent = titles[page];
+  document.getElementById('addIcon').style.display = (page==='words'?'block':'none');
+  
+  const content = document.getElementById('mainContent');
+  if(page==='tools') renderTools(content);
+  else if(page==='ess') renderEss(content);
+  // ... other pages ...
+}
+
+function renderTools(container){
+  container.innerHTML = `
+    <div class="tool-tabs">
+      <div class="tool-tab on" id="tabTime" onclick="switchTool('time')">🕐 时间</div>
+      <div class="tool-tab" id="tabNum" onclick="switchTool('num')">🔢 数字</div>
+      <div class="tool-tab" id="tabCountry" onclick="switchTool('country')">🌍 国家</div>
+    </div>
+    <div id="toolTime"> <!-- 时间练习逻辑 --> </div>
+    <div id="toolNum" style="display:none"> <!-- 数字练习逻辑 --> </div>
+    <div id="toolCountry" style="display:none">
+       <div class="ess-list" id="countryList"></div>
+    </div>
+  `;
+}
+
+async function switchTool(t){
+  ['time','num','country'].forEach(x => {
+    document.getElementById('tool'+x.charAt(0).toUpperCase()+x.slice(1)).style.display = (x===t?'block':'none');
+    document.getElementById('tab'+x.charAt(0).toUpperCase()+x.slice(1)).classList.toggle('on', x===t);
+  });
+  if(t==='country') loadCountries();
+}
+
+async function loadCountries(){
+  const el = document.getElementById('countryList');
+  el.innerHTML = '<div class="ess-loading">正在通过 AI 加载 195 个国家...</div>';
+  const r = await fetch('/api/essentials/国家', {headers:ah()});
+  const d = await r.json();
+  el.innerHTML = d.items.map(i => `
+    <div class="ess-card" onclick="speakText('${i.en}')">
+      <div><div class="ess-en">${i.en}</div><div class="ess-zh">${i.zh}</div></div>
+      <div class="ess-note">${i.note}</div>
+    </div>
+  `).join('');
+}
+
+function speakText(t){
+  const s = new SpeechSynthesisUtterance(t);
+  s.lang = 'en-US';
+  window.speechSynthesis.speak(s);
+}
+
+if(API_TOKEN) enterApp();
+</script>
+</body>
+</html>
