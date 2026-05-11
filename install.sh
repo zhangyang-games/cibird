@@ -327,6 +327,32 @@ get_public_ip() {
              || echo "你的VPS公网IP")
 }
 
+
+# ── 导入单词 ───────────────────────────────────────────────
+import_words() {
+    echo ""
+    echo -e "  ${BOLD}📖 导入多邻国单词本${NC}"
+    echo -e "  ${DIM}从 GitHub 拉取 words.txt 导入到词库${NC}"
+    echo ""
+    WORDS_URL="https://raw.githubusercontent.com/zhangyang-games/cibird/main/words.txt"
+    curl -sL "$WORDS_URL" | python3 -c "
+import sys,sqlite3,pathlib
+DB=pathlib.Path.home()/'cibird/cibird.db'
+if not DB.exists(): print('  找不到数据库'); exit(1)
+words=[l.strip().split('|',1) for l in sys.stdin if '|' in l]
+conn=sqlite3.connect(DB)
+existing=set(r[0].lower() for r in conn.execute('SELECT word FROM words'))
+added=skipped=0
+for w in words:
+    if len(w)!=2: continue
+    word,meaning=w
+    if word.lower() in existing: skipped+=1; continue
+    conn.execute('INSERT INTO words(word,meaning,phonetic,pos,examples,note) VALUES(?,?,?,?,?,?)',(word,meaning,'','','[]',''))
+    existing.add(word.lower()); added+=1
+conn.commit(); conn.close()
+print(f'  ✓ 导入完成！新增 {added} 个，跳过 {skipped} 个')
+" || echo -e "  ${RED}✗ 导入失败，请检查网络${NC}"
+}
 # ═══════════════════════════════════════════════════════════
 #  MAIN
 # ═══════════════════════════════════════════════════════════
@@ -346,6 +372,13 @@ write_config
 start_service
 write_shortcut
 get_public_ip
+
+# ── 可选：导入单词 ─────────────────────────────────────────
+echo ""
+read -p "  👉 是否导入你的多邻国单词本？（输入 y 导入，回车跳过）：" IMPORT_CHOICE
+if [ "$IMPORT_CHOICE" = "y" ] || [ "$IMPORT_CHOICE" = "Y" ]; then
+    import_words
+fi
 
 # ── 完成提示 ──────────────────────────────────────────────
 echo ""
