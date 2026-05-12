@@ -396,66 +396,78 @@ textarea.ti{resize:none;min-height:68px;line-height:1.6;}
       </button>
     </div>
 
-    <!-- ─── PANEL 3: 时间 & 数字 ─── -->
+    <!-- ─── PANEL 3: 练习 ─── -->
     <div class="panel" id="pEssential">
       <div class="phead">
         <div class="phead-title">练习</div>
         <div class="phead-right"><span class="badge">互动</span></div>
       </div>
-      <div class="tool-wrap">
-        <!-- Tab 切换 -->
-        <div class="tool-tabs">
-          <div class="tool-tab on" id="tabTime" onclick="switchTool('time')">🕐 时间</div>
-          <div class="tool-tab" id="tabNum" onclick="switchTool('num')">🔢 数字</div>
-        </div>
 
-        <!-- 时间工具 -->
-        <div id="toolTime">
-          <div class="picker-area">
-            <div class="picker-line"></div>
-            <div class="picker-row">
-              <!-- 小时列 -->
-              <div class="picker-col" id="pcHour"></div>
-              <div class="picker-sep">:</div>
-              <!-- 分钟列 -->
-              <div class="picker-col" id="pcMin"></div>
-              <div class="picker-sep" style="font-size:14px;color:#aeaeb2;writing-mode:vertical-lr;transform:rotate(180deg);padding:0 8px;"></div>
-              <!-- AM/PM -->
-              <div class="picker-col" id="pcAmpm" style="max-width:70px;"></div>
-            </div>
-          </div>
-          <div class="result-card" onclick="speakResult('time')" id="timeResult">
-            <div class="result-left">
-              <div class="result-en" id="timeEn">选择时间后自动生成</div>
-              <div class="result-zh" id="timeZh"></div>
-            </div>
-            <div class="result-speak">🔊</div>
+      <!-- Tab 横向滚动条 -->
+      <div class="cat-track" id="toolTabTrack">
+        <div class="cat-tab on" id="tabTime" onclick="switchTool('time')">🕐 时间</div>
+        <div class="cat-tab" id="tabNum" onclick="switchTool('num')">🔢 数字</div>
+        <div class="cat-tab" id="tabCountry" onclick="switchTool('country')">🌍 国家</div>
+        <div class="cat-tab" id="tabMonth" onclick="switchTool('month')">📅 月</div>
+        <div class="cat-tab" id="tabWeek" onclick="switchTool('week')">📆 周</div>
+        <div class="cat-tab" id="tabAnimal" onclick="switchTool('animal')">🐾 动物</div>
+        <div class="cat-tab" id="tabFood" onclick="switchTool('food')">🍽️ 食物</div>
+        <div class="cat-tab" id="tabJob" onclick="switchTool('job')">💼 职业</div>
+      </div>
+
+      <!-- 时间工具 -->
+      <div class="tool-wrap" id="toolTime">
+        <div class="picker-area">
+          <div class="picker-line"></div>
+          <div class="picker-row">
+            <div class="picker-col" id="pcHour"></div>
+            <div class="picker-sep">:</div>
+            <div class="picker-col" id="pcMin"></div>
+            <div class="picker-sep" style="font-size:14px;color:#aeaeb2;writing-mode:vertical-lr;transform:rotate(180deg);padding:0 8px;"></div>
+            <div class="picker-col" id="pcAmpm" style="max-width:70px;"></div>
           </div>
         </div>
-
-        <!-- 数字工具 -->
-        <div id="toolNum" style="display:none">
-          <div class="num-input-wrap">
-            <input class="num-input" type="number" id="numIn" placeholder="输入数字…" oninput="onNumInput()" inputmode="numeric">
-            <div class="num-clear" onclick="clearNum()">✕</div>
+        <div class="result-card" onclick="speakResult('time')" id="timeResult">
+          <div class="result-left">
+            <div class="result-en" id="timeEn">选择时间后自动生成</div>
+            <div class="result-zh" id="timeZh"></div>
           </div>
-          <div class="num-examples">
-            <div class="num-eg" onclick="setNum(42)">42</div>
-            <div class="num-eg" onclick="setNum(100)">100</div>
-            <div class="num-eg" onclick="setNum(365)">365</div>
-            <div class="num-eg" onclick="setNum(1024)">1,024</div>
-            <div class="num-eg" onclick="setNum(99999)">99,999</div>
-            <div class="num-eg" onclick="setNum(1000000)">1M</div>
-          </div>
-          <div class="result-card" onclick="speakResult('num')" id="numResult" style="display:none">
-            <div class="result-left">
-              <div class="result-en" id="numEn"></div>
-              <div class="result-zh" id="numZh"></div>
-            </div>
-            <div class="result-speak">🔊</div>
-          </div>
+          <div class="result-speak">🔊</div>
         </div>
       </div>
+
+      <!-- 数字工具 -->
+      <div class="tool-wrap" id="toolNum" style="display:none">
+        <div class="num-input-wrap">
+          <input class="num-input" type="number" id="numIn" placeholder="输入数字…" oninput="onNumInput()" inputmode="numeric">
+          <div class="num-clear" onclick="clearNum()">✕</div>
+        </div>
+        <div class="num-examples">
+          <div class="num-eg" onclick="setNum(42)">42</div>
+          <div class="num-eg" onclick="setNum(100)">100</div>
+          <div class="num-eg" onclick="setNum(365)">365</div>
+          <div class="num-eg" onclick="setNum(1024)">1,024</div>
+          <div class="num-eg" onclick="setNum(99999)">99,999</div>
+          <div class="num-eg" onclick="setNum(1000000)">1M</div>
+        </div>
+        <div class="result-card" onclick="speakResult('num')" id="numResult" style="display:none">
+          <div class="result-left">
+            <div class="result-en" id="numEn"></div>
+            <div class="result-zh" id="numZh"></div>
+          </div>
+          <div class="result-speak">🔊</div>
+        </div>
+      </div>
+
+      <!-- 国家（AI接口）-->
+      <div class="ess-list" id="toolCountry" style="display:none"></div>
+
+      <!-- 静态词库面板（月/周/动物/食物/职业）-->
+      <div class="ess-list" id="toolMonth" style="display:none"></div>
+      <div class="ess-list" id="toolWeek" style="display:none"></div>
+      <div class="ess-list" id="toolAnimal" style="display:none"></div>
+      <div class="ess-list" id="toolFood" style="display:none"></div>
+      <div class="ess-list" id="toolJob" style="display:none"></div>
     </div>
 
   </div><!-- /h-track -->
@@ -876,6 +888,9 @@ const _origGoPanel=goPanel;
 // TOOL: 时间 & 数字
 // ═══════════════════════════
 function initTools(){
+  // 确保时间面板用 flex 布局
+  const tw=document.getElementById('toolTime');
+  if(tw){tw.style.display='flex';tw.style.flexDirection='column';}
   buildPicker('pcHour', Array.from({length:12},(_,i)=>String(i+1).padStart(2,'0')), 0);
   buildPicker('pcMin',  Array.from({length:60},(_,i)=>String(i).padStart(2,'0')), 0);
   buildPicker('pcAmpm', ['AM','PM'], 0);
@@ -984,11 +999,81 @@ function speakResult(type){
   const u=new SpeechSynthesisUtterance(text);u.lang='en-US';u.rate=.78;window.speechSynthesis.speak(u);
 }
 
+// 所有工具面板 id 列表
+const TOOL_IDS = ['time','num','country','month','week','animal','food','job'];
+const TOOL_TAB_IDS = {
+  time:'tabTime', num:'tabNum', country:'tabCountry',
+  month:'tabMonth', week:'tabWeek', animal:'tabAnimal',
+  food:'tabFood', job:'tabJob'
+};
+
+// 静态词库已加载标记
+const staticLoaded = {};
+
 function switchTool(t){
-  document.getElementById('toolTime').style.display=t==='time'?'block':'none';
-  document.getElementById('toolNum').style.display=t==='num'?'block':'none';
-  document.getElementById('tabTime').classList.toggle('on',t==='time');
-  document.getElementById('tabNum').classList.toggle('on',t==='num');
+  TOOL_IDS.forEach(x=>{
+    const el=document.getElementById('tool'+x.charAt(0).toUpperCase()+x.slice(1));
+    if(el) el.style.display=(x===t?'':'none');
+    const tab=document.getElementById(TOOL_TAB_IDS[x]);
+    if(tab) tab.classList.toggle('on',x===t);
+  });
+  // 时间面板用 flex
+  if(t==='time'){
+    const tw=document.getElementById('toolTime');
+    if(tw) tw.style.display='flex';
+    tw.style.flexDirection='column';
+  }
+  // 按需加载
+  if(t==='country' && !staticLoaded['country']) loadVocabAI('country','国家');
+  if(['month','week','animal','food','job'].includes(t) && !staticLoaded[t]) loadVocabStatic(t);
+}
+
+// 加载静态词库（月/周/动物/食物/职业）
+const STATIC_CAT = {month:'月', week:'周', animal:'动物', food:'食物', job:'职业'};
+async function loadVocabStatic(key){
+  const el=document.getElementById('tool'+key.charAt(0).toUpperCase()+key.slice(1));
+  el.innerHTML='<div class="ess-loading"><div class="mini-spin"></div> 加载中…</div>';
+  try{
+    const r=await fetch('/api/static/'+encodeURIComponent(STATIC_CAT[key]),{headers:ah()});
+    const d=await r.json();
+    renderVocabList(el, d.items||[]);
+    staticLoaded[key]=true;
+  }catch(e){el.innerHTML='<div class="ess-loading">加载失败，请重试</div>';}
+}
+
+// 加载 AI 词库（国家）
+async function loadVocabAI(key, cat){
+  const el=document.getElementById('tool'+key.charAt(0).toUpperCase()+key.slice(1));
+  el.innerHTML='<div class="ess-loading"><div class="mini-spin"></div> AI 加载中，稍等…</div>';
+  try{
+    const r=await fetch('/api/essentials/'+encodeURIComponent(cat),{headers:ah()});
+    const d=await r.json();
+    renderVocabList(el, d.items||[]);
+    staticLoaded[key]=true;
+  }catch(e){el.innerHTML='<div class="ess-loading">加载失败，请重试</div>';}
+}
+
+function renderVocabList(el, items){
+  if(!items.length){el.innerHTML='<div class="ess-loading">暂无数据</div>';return;}
+  el.innerHTML=items.map(i=>`
+    <div class="ess-card" onclick="speakVocab('${esc(i.en)}')">
+      <div class="ess-left">
+        <div class="ess-en">${esc(i.en)}</div>
+        <div class="ess-zh">${esc(i.zh)}</div>
+      </div>
+      <div class="ess-right">
+        <div class="ess-note">${esc(i.note||'')}</div>
+        <div class="ess-speak">🔊</div>
+      </div>
+    </div>`).join('');
+}
+
+function speakVocab(text){
+  if(!window.speechSynthesis)return;
+  window.speechSynthesis.cancel();
+  const u=new SpeechSynthesisUtterance(text);
+  u.lang='en-US';u.rate=0.82;
+  window.speechSynthesis.speak(u);
 }
 
 // 数字转英文

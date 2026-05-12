@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-CiBird 词鸟 - 后端服务 v2
+CiBird 词鸟 - 后端服务 v2.2
 FastAPI + SQLite，支持多 AI 服务商
-新增：今日金句 / 打卡记录 / 必学模块
+新增：月/周/动物/食物/职业 静态词库接口
 """
 
 import os, json, sqlite3, secrets, hashlib, time, random
@@ -38,296 +38,162 @@ def init_db():
         conn.execute("""CREATE TABLE IF NOT EXISTS sessions (
             token TEXT PRIMARY KEY,
             created INTEGER DEFAULT (strftime('%s','now')))""")
-        # 打卡记录表：date_str = YYYY-MM-DD，count = 当天操作数
-        conn.execute("""CREATE TABLE IF NOT EXISTS checkins (
+        conn.execute("""CREATE TABLE IF NOT EXISTS punch_cards (
             date_str TEXT PRIMARY KEY,
-            count    INTEGER DEFAULT 0)""")
-        # 今日金句缓存：date_str + word_id
-        conn.execute("""CREATE TABLE IF NOT EXISTS daily_quote (
-            date_str TEXT PRIMARY KEY,
-            word_id  INTEGER,
-            sentence_en TEXT DEFAULT '',
-            sentence_zh TEXT DEFAULT '')""")
-        # 必学模块内容缓存
-        conn.execute("""CREATE TABLE IF NOT EXISTS essentials (
-            category TEXT PRIMARY KEY,
-            content  TEXT DEFAULT '[]',
-            updated  INTEGER DEFAULT 0)""")
-        conn.commit()
+            count INTEGER DEFAULT 0)""")
 
-@contextmanager
-def get_db():
-    conn = sqlite3.connect(DB_FILE)
-    conn.row_factory = sqlite3.Row
-    try:
-        yield conn
-        conn.commit()
-    finally:
-        conn.close()
-
-def today_str():
-    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
-
-def bump_checkin():
-    """每次用户有实质操作就调用，给今天打卡+1"""
-    ds = today_str()
-    with get_db() as db:
-        db.execute("""INSERT INTO checkins(date_str,count) VALUES(?,1)
-            ON CONFLICT(date_str) DO UPDATE SET count=count+1""", (ds,))
-
-# ── APP ───────────────────────────────────────────────────────
-app = FastAPI(title="CiBird", docs_url=None, redoc_url=None)
-security = HTTPBearer()
-
-def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    tok = credentials.credentials
-    with get_db() as db:
-        row = db.execute("SELECT token FROM sessions WHERE token=?", (tok,)).fetchone()
-        if not row:
-            raise HTTPException(status_code=401, detail="未登录或登录已过期")
-    return tok
-
-# ── Models ────────────────────────────────────────────────────
-class LoginReq(BaseModel):
-    username: str; password: str
-
-class WordReq(BaseModel):
-    word: str; meaning: str=""; phonetic: str=""; pos: str=""; examples: list=[]; note: str=""
-
-class GenerateReq(BaseModel):
-    word: str
-
-class EssentialReq(BaseModel):
-    category: str
-
-class NoteReq(BaseModel):
-    note: str
-
-class ExamplesReq(BaseModel):
-    examples: list
-
-# ── 前端 ──────────────────────────────────────────────────────
-@app.get("/", response_class=HTMLResponse)
-async def serve_frontend():
-    if HTML_FILE.exists():
-        return HTML_FILE.read_text(encoding="utf-8")
-    return HTMLResponse("<h1>index.html 未找到</h1>", status_code=404)
-
-# ── 登录 ──────────────────────────────────────────────────────
-@app.post("/api/login")
-async def login(req: LoginReq):
-    cfg = load_config()
-    if req.username != cfg["username"]:
-        raise HTTPException(status_code=401, detail="用户名或密码错误")
-    if hashlib.sha256(req.password.encode()).hexdigest() != cfg["password_hash"]:
-        raise HTTPException(status_code=401, detail="用户名或密码错误")
-    tok = secrets.token_urlsafe(32)
-    with get_db() as db:
-        db.execute("DELETE FROM sessions WHERE created<?", (int(time.time())-7*86400,))
-        db.execute("INSERT INTO sessions(token) VALUES(?)", (tok,))
-    return {"token": tok}
-
-# ── 词库 ──────────────────────────────────────────────────────
-@app.get("/api/words")
-async def list_words(tok=Depends(verify_token)):
-    with get_db() as db:
-        rows = db.execute("SELECT id,word,meaning,phonetic,pos,examples,note,created FROM words ORDER BY created DESC").fetchall()
-    result = []
-    for r in rows:
-        d = dict(r)
-        try: d["examples"] = json.loads(d["examples"] or "[]")
-        except: d["examples"] = []
-        result.append(d)
-    return result
-
-@app.post("/api/words")
-async def add_word(req: WordReq, tok=Depends(verify_token)):
-    with get_db() as db:
-        cur = db.execute(
-            "INSERT INTO words(word,meaning,phonetic,pos,examples,note) VALUES(?,?,?,?,?,?)",
-            (req.word.strip(), req.meaning, req.phonetic, req.pos,
-             json.dumps(req.examples, ensure_ascii=False), req.note))
-    bump_checkin()
-    return {"id": cur.lastrowid, "word": req.word}
-
-@app.delete("/api/words/{wid}")
-async def del_word(wid: int, tok=Depends(verify_token)):
-    with get_db() as db:
-        db.execute("DELETE FROM words WHERE id=?", (wid,))
-    return {"ok": True}
-
-@app.patch("/api/words/{wid}/note")
-async def update_note(wid: int, req: NoteReq, tok=Depends(verify_token)):
-    with get_db() as db:
-        db.execute("UPDATE words SET note=? WHERE id=?", (req.note, wid))
-    bump_checkin()
-    return {"ok": True}
-
-@app.patch("/api/words/{wid}/examples")
-async def update_examples(wid: int, req: ExamplesReq, tok=Depends(verify_token)):
-    with get_db() as db:
-        db.execute("UPDATE words SET examples=? WHERE id=?",
-                   (json.dumps(req.examples, ensure_ascii=False), wid))
-    bump_checkin()
-    return {"ok": True}
-
-# ── 打卡记录 ──────────────────────────────────────────────────
-@app.get("/api/checkins")
-async def get_checkins(tok=Depends(verify_token)):
-    """返回最近 90 天的打卡记录"""
-    with get_db() as db:
-        rows = db.execute(
-            "SELECT date_str, count FROM checkins ORDER BY date_str DESC LIMIT 90"
-        ).fetchall()
-        total = db.execute("SELECT COUNT(*) FROM words").fetchone()[0]
-    return {
-        "records": [{"date": r["date_str"], "count": r["count"]} for r in rows],
-        "total_words": total,
-        "today": today_str()
-    }
-
-# ── 今日金句 ──────────────────────────────────────────────────
-@app.get("/api/daily-quote")
-async def get_daily_quote(tok=Depends(verify_token)):
-    ds = today_str()
-    with get_db() as db:
-        # 先查缓存
-        row = db.execute("SELECT * FROM daily_quote WHERE date_str=?", (ds,)).fetchone()
-        if row and row["sentence_en"]:
-            word_row = db.execute("SELECT word,meaning FROM words WHERE id=?", (row["word_id"],)).fetchone()
-            return {
-                "word": word_row["word"] if word_row else "",
-                "meaning": word_row["meaning"] if word_row else "",
-                "sentence_en": row["sentence_en"],
-                "sentence_zh": row["sentence_zh"],
-                "date": ds
-            }
-        # 没有缓存，随机选一个有例句的词
-        words_with_ex = db.execute(
-            "SELECT id,word,meaning,examples FROM words WHERE examples!='[]' AND examples!='' ORDER BY RANDOM() LIMIT 1"
-        ).fetchone()
-        if not words_with_ex:
-            # 没有例句就随机选任意词
-            words_with_ex = db.execute("SELECT id,word,meaning,examples FROM words ORDER BY RANDOM() LIMIT 1").fetchone()
-        if not words_with_ex:
-            return {"word": "", "meaning": "", "sentence_en": "Keep learning!", "sentence_zh": "坚持学习！", "date": ds}
-
-    # 从例句里取第一条
-    try:
-        exs = json.loads(words_with_ex["examples"] or "[]")
-        en = exs[0]["en"] if exs else ""
-        zh = exs[0]["zh"] if exs else ""
-    except:
-        en = zh = ""
-
-    with get_db() as db:
-        db.execute("""INSERT INTO daily_quote(date_str,word_id,sentence_en,sentence_zh) VALUES(?,?,?,?)
-            ON CONFLICT(date_str) DO UPDATE SET word_id=?,sentence_en=?,sentence_zh=?""",
-            (ds, words_with_ex["id"], en, zh, words_with_ex["id"], en, zh))
-
-    return {
-        "word": words_with_ex["word"],
-        "meaning": words_with_ex["meaning"],
-        "sentence_en": en,
-        "sentence_zh": zh,
-        "date": ds
-    }
-
-# ── 必学模块 ──────────────────────────────────────────────────
-ESSENTIAL_SYSTEM = """You are an English learning assistant for a Chinese user.
-Generate a structured vocabulary list for the given category. Return ONLY raw JSON array, no markdown, no explanation.
-Each item must have: {"en": "English word or phrase", "zh": "中文", "note": "optional short tip in Chinese, max 10 chars, or empty string"}
-Make it practical, conversational, suitable for daily life / Twitter / gaming context.
-Generate 8-12 items."""
-
-CATEGORIES = {
-    "时间": "Common time expressions in English (morning, noon, afternoon, evening, midnight, rush hour, etc.)",
-    "数字": "Numbers and counting in English context (dozen, score, hundred, thousand, million, billion, etc.) with practical usage",
-    "日期": "Days of the week in English with common abbreviations",
-    "十二个月": "12 months of the year in English with abbreviations",
-    "问候": "Common English greetings and farewells for daily life and social media",
-    "情绪": "English words for emotions and feelings, including internet slang",
-    "游戏": "Common English gaming terms and phrases (gg, afk, buff, nerf, etc.)",
-    "推特": "Common English Twitter/social media slang and expressions (lol, smh, tbh, ngl, etc.)",
+# ── 静态词库 ───────────────────────────────────────────────────
+STATIC_DATA = {
+    "月": [
+        {"en":"January","zh":"一月","note":"1月 / Jan"},
+        {"en":"February","zh":"二月","note":"2月 / Feb"},
+        {"en":"March","zh":"三月","note":"3月 / Mar"},
+        {"en":"April","zh":"四月","note":"4月 / Apr"},
+        {"en":"May","zh":"五月","note":"5月 / May"},
+        {"en":"June","zh":"六月","note":"6月 / Jun"},
+        {"en":"July","zh":"七月","note":"7月 / Jul"},
+        {"en":"August","zh":"八月","note":"8月 / Aug"},
+        {"en":"September","zh":"九月","note":"9月 / Sep"},
+        {"en":"October","zh":"十月","note":"10月 / Oct"},
+        {"en":"November","zh":"十一月","note":"11月 / Nov"},
+        {"en":"December","zh":"十二月","note":"12月 / Dec"},
+    ],
+    "周": [
+        {"en":"Monday","zh":"星期一","note":"Mon"},
+        {"en":"Tuesday","zh":"星期二","note":"Tue"},
+        {"en":"Wednesday","zh":"星期三","note":"Wed"},
+        {"en":"Thursday","zh":"星期四","note":"Thu"},
+        {"en":"Friday","zh":"星期五","note":"Fri"},
+        {"en":"Saturday","zh":"星期六","note":"Sat"},
+        {"en":"Sunday","zh":"星期日","note":"Sun"},
+    ],
+    "动物": [
+        {"en":"dog","zh":"狗","note":"🐶"},
+        {"en":"cat","zh":"猫","note":"🐱"},
+        {"en":"lion","zh":"狮子","note":"🦁"},
+        {"en":"tiger","zh":"老虎","note":"🐯"},
+        {"en":"elephant","zh":"大象","note":"🐘"},
+        {"en":"bear","zh":"熊","note":"🐻"},
+        {"en":"monkey","zh":"猴子","note":"🐵"},
+        {"en":"giraffe","zh":"长颈鹿","note":"🦒"},
+        {"en":"zebra","zh":"斑马","note":"🦓"},
+        {"en":"wolf","zh":"狼","note":"🐺"},
+        {"en":"fox","zh":"狐狸","note":"🦊"},
+        {"en":"rabbit","zh":"兔子","note":"🐰"},
+        {"en":"horse","zh":"马","note":"🐴"},
+        {"en":"cow","zh":"奶牛","note":"🐮"},
+        {"en":"pig","zh":"猪","note":"🐷"},
+        {"en":"sheep","zh":"羊","note":"🐑"},
+        {"en":"chicken","zh":"鸡","note":"🐔"},
+        {"en":"duck","zh":"鸭子","note":"🦆"},
+        {"en":"penguin","zh":"企鹅","note":"🐧"},
+        {"en":"eagle","zh":"老鹰","note":"🦅"},
+        {"en":"parrot","zh":"鹦鹉","note":"🦜"},
+        {"en":"snake","zh":"蛇","note":"🐍"},
+        {"en":"crocodile","zh":"鳄鱼","note":"🐊"},
+        {"en":"shark","zh":"鲨鱼","note":"🦈"},
+        {"en":"whale","zh":"鲸鱼","note":"🐋"},
+        {"en":"dolphin","zh":"海豚","note":"🐬"},
+        {"en":"frog","zh":"青蛙","note":"🐸"},
+        {"en":"butterfly","zh":"蝴蝶","note":"🦋"},
+        {"en":"bee","zh":"蜜蜂","note":"🐝"},
+        {"en":"spider","zh":"蜘蛛","note":"🕷️"},
+    ],
+    "食物": [
+        {"en":"rice","zh":"米饭","note":"🍚"},
+        {"en":"noodles","zh":"面条","note":"🍜"},
+        {"en":"bread","zh":"面包","note":"🍞"},
+        {"en":"pizza","zh":"披萨","note":"🍕"},
+        {"en":"burger","zh":"汉堡","note":"🍔"},
+        {"en":"hot dog","zh":"热狗","note":"🌭"},
+        {"en":"sandwich","zh":"三明治","note":"🥪"},
+        {"en":"sushi","zh":"寿司","note":"🍣"},
+        {"en":"steak","zh":"牛排","note":"🥩"},
+        {"en":"chicken","zh":"鸡肉","note":"🍗"},
+        {"en":"fish","zh":"鱼","note":"🐟"},
+        {"en":"egg","zh":"鸡蛋","note":"🥚"},
+        {"en":"salad","zh":"沙拉","note":"🥗"},
+        {"en":"soup","zh":"汤","note":"🍲"},
+        {"en":"dumpling","zh":"饺子","note":"🥟"},
+        {"en":"apple","zh":"苹果","note":"🍎"},
+        {"en":"banana","zh":"香蕉","note":"🍌"},
+        {"en":"orange","zh":"橙子","note":"🍊"},
+        {"en":"strawberry","zh":"草莓","note":"🍓"},
+        {"en":"watermelon","zh":"西瓜","note":"🍉"},
+        {"en":"grape","zh":"葡萄","note":"🍇"},
+        {"en":"mango","zh":"芒果","note":"🥭"},
+        {"en":"potato","zh":"土豆","note":"🥔"},
+        {"en":"tomato","zh":"西红柿","note":"🍅"},
+        {"en":"carrot","zh":"胡萝卜","note":"🥕"},
+        {"en":"cake","zh":"蛋糕","note":"🎂"},
+        {"en":"ice cream","zh":"冰淇淋","note":"🍦"},
+        {"en":"chocolate","zh":"巧克力","note":"🍫"},
+        {"en":"coffee","zh":"咖啡","note":"☕"},
+        {"en":"tea","zh":"茶","note":"🍵"},
+    ],
+    "职业": [
+        {"en":"doctor","zh":"医生","note":"🏥"},
+        {"en":"nurse","zh":"护士","note":"👩‍⚕️"},
+        {"en":"teacher","zh":"老师","note":"👩‍🏫"},
+        {"en":"engineer","zh":"工程师","note":"👨‍💻"},
+        {"en":"programmer","zh":"程序员","note":"💻"},
+        {"en":"designer","zh":"设计师","note":"🎨"},
+        {"en":"lawyer","zh":"律师","note":"⚖️"},
+        {"en":"judge","zh":"法官","note":"👨‍⚖️"},
+        {"en":"police","zh":"警察","note":"👮"},
+        {"en":"firefighter","zh":"消防员","note":"🚒"},
+        {"en":"soldier","zh":"士兵","note":"💂"},
+        {"en":"chef","zh":"厨师","note":"👨‍🍳"},
+        {"en":"waiter","zh":"服务员","note":"🍽️"},
+        {"en":"driver","zh":"司机","note":"🚗"},
+        {"en":"pilot","zh":"飞行员","note":"✈️"},
+        {"en":"sailor","zh":"水手","note":"⚓"},
+        {"en":"farmer","zh":"农民","note":"👨‍🌾"},
+        {"en":"scientist","zh":"科学家","note":"🔬"},
+        {"en":"artist","zh":"艺术家","note":"🎭"},
+        {"en":"singer","zh":"歌手","note":"🎤"},
+        {"en":"actor","zh":"演员","note":"🎬"},
+        {"en":"athlete","zh":"运动员","note":"🏅"},
+        {"en":"journalist","zh":"记者","note":"📰"},
+        {"en":"photographer","zh":"摄影师","note":"📷"},
+        {"en":"accountant","zh":"会计","note":"💰"},
+        {"en":"manager","zh":"经理","note":"👔"},
+        {"en":"secretary","zh":"秘书","note":"📋"},
+        {"en":"salesperson","zh":"销售员","note":"🛍️"},
+        {"en":"mechanic","zh":"机械师","note":"🔧"},
+        {"en":"electrician","zh":"电工","note":"⚡"},
+    ],
 }
 
-@app.get("/api/essentials/categories")
-async def get_categories(tok=Depends(verify_token)):
-    return {"categories": list(CATEGORIES.keys())}
-
-@app.get("/api/essentials/{category}")
-async def get_essential(category: str, tok=Depends(verify_token)):
-    if category not in CATEGORIES:
-        raise HTTPException(status_code=404, detail="分类不存在")
-    # 查缓存（24小时有效）
-    with get_db() as db:
-        row = db.execute("SELECT content, updated FROM essentials WHERE category=?", (category,)).fetchone()
-        if row and (int(time.time()) - row["updated"]) < 86400:
-            try:
-                return {"category": category, "items": json.loads(row["content"])}
-            except: pass
-
-    # 调 AI 生成
-    cfg = load_config()
-    prompt = CATEGORIES[category]
-    try:
-        result = await call_ai(
-            cfg.get("provider",""), cfg.get("api_key",""), cfg.get("model",""),
-            ESSENTIAL_SYSTEM,
-            f"Generate vocabulary list for category: {prompt}"
-        )
-        import re
-        m = re.search(r'\[[\s\S]*\]', result)
-        items = json.loads(m.group()) if m else []
-    except:
-        items = []
-
-    with get_db() as db:
-        db.execute("""INSERT INTO essentials(category,content,updated) VALUES(?,?,?)
-            ON CONFLICT(category) DO UPDATE SET content=?,updated=?""",
-            (category, json.dumps(items, ensure_ascii=False), int(time.time()),
-             json.dumps(items, ensure_ascii=False), int(time.time())))
-
-    return {"category": category, "items": items}
-
-# ── AI 核心 ───────────────────────────────────────────────────
-WORD_SYSTEM = """You are an English vocabulary assistant helping a Chinese user learn English for Twitter, gaming, and daily survival abroad.
-
-The user gives you one English word. Return ONLY a raw JSON object (no markdown, no code blocks, no explanation). Use this exact format:
-{
-  "meaning": "用中文通俗解释这个词，1-2句，像朋友说话，不要词典腔",
-  "phonetic": "美式音标，例如 /rɪˈzɪliənt/",
-  "pos": "词性缩写，例如 adj / n / v",
-  "examples": [
-    {"en": "MUST be in English. Natural Twitter or gaming sentence. NO Chinese.", "zh": "中文翻译"},
-    {"en": "MUST be in English. Different scenario. NO Chinese.", "zh": "中文翻译"}
-  ]
+# ── AI 分类（需要 AI 生成的） ──────────────────────────────────
+AI_CATEGORIES = {
+    "基础": "Most common 100 English words for beginners.",
+    "推特": "Common slang and abbreviations used on Twitter/X.",
+    "游戏": "Essential vocabulary for gamers (UI, chat, mechanics).",
+    "生存": "Crucial phrases for living abroad (ordering, directions).",
+    "国家": "List of 195 countries in the world. Each item must follow format: {'en': 'Country Name', 'zh': '中文国名', 'note': 'Capital/Continent'}. Keep it accurate."
 }
-CRITICAL: "en" fields = English only. "meaning"/"zh" = Chinese only. Raw JSON only."""
 
-@app.post("/api/generate")
-async def generate(req: GenerateReq, tok=Depends(verify_token)):
+app = FastAPI()
+auth_scheme = HTTPBearer()
+
+def verify_token(cred: HTTPAuthorizationCredentials = Depends(auth_scheme)):
+    token = cred.credentials
+    with sqlite3.connect(DB_FILE) as conn:
+        row = conn.execute("SELECT token FROM sessions WHERE token=?", (token,)).fetchone()
+        if not row: raise HTTPException(status_code=401, detail="未登录")
+    return token
+
+async def ask_ai(system: str, user: str):
     cfg = load_config()
-    word = req.word.strip()
-    try:
-        result = await call_ai(cfg.get("provider",""), cfg.get("api_key",""), cfg.get("model",""),
-                               WORD_SYSTEM, f"Generate a vocabulary card for the English word: {word}")
-        try: data = json.loads(result)
-        except:
-            import re
-            m = re.search(r'\{[\s\S]*\}', result)
-            if m: data = json.loads(m.group())
-            else: raise HTTPException(status_code=500, detail="AI 返回格式异常")
-        bump_checkin()
-        return data
-    except HTTPException: raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI 调用失败：{str(e)}")
+    provider = cfg.get("provider", "gemini")
+    api_key  = cfg.get("api_key", "")
+    model    = cfg.get("model", "")
+    timeout  = 30.0
 
-async def call_ai(provider: str, api_key: str, model: str, system: str, user: str) -> str:
     headers = {"Content-Type": "application/json"}
-    timeout = httpx.Timeout(30.0)
-    if provider in ("gemini","deepseek","groq","openrouter","openai"):
+    
+    if provider in ["gemini", "deepseek", "groq", "openrouter", "openai"]:
         endpoints = {
             "gemini":     "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
             "deepseek":   "https://api.deepseek.com/chat/completions",
@@ -335,27 +201,91 @@ async def call_ai(provider: str, api_key: str, model: str, system: str, user: st
             "openrouter": "https://openrouter.ai/api/v1/chat/completions",
             "openai":     "https://api.openai.com/v1/chat/completions",
         }
+        url = endpoints[provider]
         headers["Authorization"] = f"Bearer {api_key}"
-        payload = {"model": model, "messages": [{"role":"system","content":system},{"role":"user","content":user}], "max_tokens": 800}
+        payload = {"model": model, "messages": [{"role":"system","content":system},{"role":"user","content":user}], "max_tokens": 2000}
         async with httpx.AsyncClient(timeout=timeout) as client:
-            r = await client.post(endpoints[provider], headers=headers, json=payload)
+            r = await client.post(url, headers=headers, json=payload)
             r.raise_for_status()
             return r.json()["choices"][0]["message"]["content"]
-    elif provider == "claude":
-        headers["x-api-key"] = api_key
-        headers["anthropic-version"] = "2023-06-01"
-        payload = {"model": model, "max_tokens": 800, "system": system, "messages": [{"role":"user","content":user}]}
-        async with httpx.AsyncClient(timeout=timeout) as client:
-            r = await client.post("https://api.anthropic.com/v1/messages", headers=headers, json=payload)
-            r.raise_for_status()
-            return r.json()["content"][0]["text"]
-    else:
-        raise ValueError(f"不支持的服务商：{provider}")
+    return "不支持的服务商"
+
+# ── API ───────────────────────────────────────────────────────
+@app.get("/")
+async def read_index():
+    return HTMLResponse(content=open(HTML_FILE, encoding='utf-8').read())
+
+@app.post("/api/login")
+async def login(data: dict):
+    cfg = load_config()
+    pw_hash = hashlib.sha256(data.get("password", "").encode()).hexdigest()
+    if pw_hash != cfg.get("password_hash"):
+        raise HTTPException(status_code=401, detail="密码错误")
+    token = secrets.token_hex(16)
+    with sqlite3.connect(DB_FILE) as conn:
+        conn.execute("INSERT INTO sessions (token) VALUES (?)", (token,))
+    return {"token": token}
+
+@app.get("/api/words")
+async def list_words(q: str = "", token: str = Depends(verify_token)):
+    with sqlite3.connect(DB_FILE) as conn:
+        conn.row_factory = sqlite3.Row
+        sql = "SELECT * FROM words"
+        params = []
+        if q:
+            sql += " WHERE word LIKE ? OR meaning LIKE ? OR note LIKE ?"
+            params = [f"%{q}%", f"%{q}%", f"%{q}%"]
+        sql += " ORDER BY created DESC"
+        rows = conn.execute(sql, params).fetchall()
+        return [dict(r) for r in rows]
+
+@app.post("/api/words")
+async def add_word(data: dict, token: str = Depends(verify_token)):
+    word = data.get("word", "").strip()
+    if not word: return {"error": "Word is empty"}
+    
+    system = "You are a helpful English teacher. Return ONLY JSON."
+    prompt = f"""Define '{word}'. Output JSON: 
+    {{'word': '{word}', 'phonetic': '...', 'pos': '...', 'meaning': '...', 'examples': ['English example 1 (context: Twitter/Game)', 'English example 2 (context: Daily/Living)']}}
+    """
+    try:
+        res = await ask_ai(system, prompt)
+        res_json = json.loads(res.strip('`').replace('json\n',''))
+        with sqlite3.connect(DB_FILE) as conn:
+            conn.execute("INSERT INTO words (word, meaning, phonetic, pos, examples) VALUES (?,?,?,?,?)",
+                         (res_json['word'], res_json['meaning'], res_json['phonetic'], res_json['pos'], json.dumps(res_json['examples'])))
+            today = datetime.now().strftime('%Y-%m-%d')
+            conn.execute("INSERT INTO punch_cards(date_str, count) VALUES(?,1) ON CONFLICT(date_str) DO UPDATE SET count=count+1", (today,))
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# 静态词库接口（月/周/动物/食物/职业）
+@app.get("/api/static/{cat}")
+async def get_static(cat: str, token: str = Depends(verify_token)):
+    if cat not in STATIC_DATA:
+        raise HTTPException(status_code=404, detail="分类不存在")
+    return {"items": STATIC_DATA[cat]}
+
+# AI 词库接口（国家等需要 AI 的）
+@app.get("/api/essentials/{cat}")
+async def get_essentials(cat: str, token: str = Depends(verify_token)):
+    if cat not in AI_CATEGORIES: raise HTTPException(status_code=404)
+    system = "You are a world geography and language expert. Return ONLY JSON array of objects."
+    prompt = f"{AI_CATEGORIES[cat]} Output format: {{'items': [{{'en': '...', 'zh': '...', 'note': '...'}}, ...]}}"
+    try:
+        res = await ask_ai(system, prompt)
+        return json.loads(res.strip('`').replace('json\n',''))
+    except:
+        return {"items": []}
+
+@app.get("/api/stats")
+async def get_stats(token: str = Depends(verify_token)):
+    with sqlite3.connect(DB_FILE) as conn:
+        rows = conn.execute("SELECT date_str, count FROM punch_cards ORDER BY date_str DESC LIMIT 100").fetchall()
+        return {r[0]: r[1] for r in rows}
 
 if __name__ == "__main__":
     import uvicorn
-    cfg = load_config()
-    port = int(cfg.get("port", 8848))
     init_db()
-    print(f"\n🦜 CiBird 词鸟 v2 已启动！访问 http://0.0.0.0:{port}\n")
-    uvicorn.run("server:app", host="0.0.0.0", port=port, log_level="warning")
+    uvicorn.run(app, host="0.0.0.0", port=8848)
