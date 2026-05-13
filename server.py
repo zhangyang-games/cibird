@@ -11,7 +11,7 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 
 from fastapi import FastAPI, HTTPException, Depends
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 import httpx
@@ -411,6 +411,14 @@ async def ask_ai(system: str, user: str):
 @app.get("/")
 async def read_index():
     return HTMLResponse(content=open(HTML_FILE, encoding='utf-8').read())
+
+@app.get("/Cibird.png")
+async def get_icon():
+    icon_path = BASE_DIR / "Cibird.png"
+    if not icon_path.exists():
+        raise HTTPException(status_code=404, detail="图标文件不存在")
+    return FileResponse(str(icon_path), media_type="image/png")
+
 
 @app.post("/api/login")
 async def login(data: dict):
