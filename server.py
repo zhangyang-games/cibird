@@ -494,3 +494,71 @@ if __name__ == "__main__":
     import uvicorn
     init_db()
     uvicorn.run(app, host="0.0.0.0", port=8848)
+
+# ── 补全缺失接口 ──────────────────────────────────────────────
+
+# AI 生成单词详情（添加单词用）
+@app.post("/api/generate")
+async def generate_word(data: dict, token: str = Depends(verify_token)):
+    word = data.get("word", "").strip()
+    if not word: raise HTTPException(status_code=400, detail="Word is empty")
+    system = "You are a helpful English teacher. Return ONLY valid JSON, no markdown."
+    prompt = f"""Define '{word}'. Return JSON exactly:
+{{"word":"{word}","phonetic":"...","pos":"...","meaning":"中文释义","examples":[{{"en":"example sentence 1 (Twitter/Game context)","zh":"中文翻译1"}},{{"en":"example sentence 2 (Daily/Living context)","zh":"中文翻译2"}}]}}"""
+    try:
+        res = await ask_ai(system, prompt)
+        clean = res.strip().strip('`').removeprefix('json').strip()
+        return json.loads(clean)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# 更新单词例句
+@app.patch("/api/words/{word_id}/examples")
+async def update_examples(word_id: int, data: dict, token: str = Depends(verify_token)):
+    examples = data.get("examples", [])
+    with sqlite3.connect(DB_FILE) as conn:
+        conn.execute("UPDATE words SET examples=? WHERE id=?", (json.dumps(examples), word_id))
+    return {"success": True}
+
+# 更新单词笔记
+@app.patch("/api/words/{word_id}/note")
+async def update_note(word_id: int, data: dict, token: str = Depends(verify_token)):
+    note = data.get("note", "")
+    with sqlite3.connect(DB_FILE) as conn:
+        conn.execute("UPDATE words SET note=? WHERE id=?", (note, word_id))
+    return {"success": True}
+
+# 删除单词
+@app.delete("/api/words/{word_id}")
+async def delete_word(word_id: int, token: str = Depends(verify_token)):
+    with sqlite3.connect(DB_FILE) as conn:
+        conn.execute("DELETE FROM words WHERE id=?", (word_id,))
+    return {"success": True}
+
+# 打卡统计
+@app.get("/api/checkins")
+async def get_checkins(token: str = Depends(verify_token)):
+    with sqlite3.connect(DB_FILE) as conn:
+        total = conn.execute("SELECT COUNT(*) FROM words").fetchone()[0]
+        rows = conn.execute("SELECT date_str, count FROM punch_cards ORDER BY date_str DESC LIMIT 100").fetchall()
+        today = datetime.now().strftime('%Y-%m-%d')
+        records = [{"date": r[0], "count": r[1]} for r in rows]
+    return {"total_words": total, "today": today, "records": records}
+
+# 今日金句（从词库随机取一个词的例句）
+@app.get("/api/daily-quote")
+async def daily_quote(token: str = Depends(verify_token)):
+    today = datetime.now().strftime('%Y-%m-%d')
+    with sqlite3.connect(DB_FILE) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute("SELECT * FROM words WHERE examples != '[]' ORDER BY RANDOM() LIMIT 10").fetchall()
+        if not rows:
+            return {"word": "CiBird", "sentence_en": "Keep learning every day!", "sentence_zh": "每天坚持学习！", "date": today}
+        # 用日期做种子，同一天返回同一个词
+        seed = sum(ord(c) for c in today)
+        w = rows[seed % len(rows)]
+        exs = json.loads(w["examples"] or "[]")
+        ex = exs[0] if exs else {}
+        if isinstance(ex, str):
+            return {"word": w["word"], "sentence_en": ex, "sentence_zh": "", "date": today}
+        return {"word": w["word"], "sentence_en": ex.get("en",""), "sentence_zh": ex.get("zh",""), "date": today}
