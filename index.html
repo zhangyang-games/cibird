@@ -6,8 +6,6 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#f5f5f7">
 <title>CiBird | 词鸟</title>
-<link rel="icon" type="image/png" href="https://cdn.jsdelivr.net/gh/zhangyang-games/cibird@main/Cibird.png?v=3">
-<link rel="apple-touch-icon" href="https://cdn.jsdelivr.net/gh/zhangyang-games/cibird@main/Cibird.png?v=3">
 <style>
 /* ── RESET & BASE ─────────────────────────────────────────── */
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;outline:none;-webkit-touch-callout:none;margin:0;padding:0;}
@@ -1026,12 +1024,11 @@ function switchTool(t){
     tw.style.flexDirection='column';
   }
   // 按需加载
-  if(t==='country' && !staticLoaded['country']) loadVocabAI('country','国家');
-  if(['month','week','animal','food','job'].includes(t) && !staticLoaded[t]) loadVocabStatic(t);
+  if(['country','month','week','animal','food','job'].includes(t) && !staticLoaded[t]) loadVocabStatic(t);
 }
 
-// 加载静态词库（月/周/动物/食物/职业）
-const STATIC_CAT = {month:'月', week:'周', animal:'动物', food:'食物', job:'职业'};
+// 加载静态词库（国家/月/周/动物/食物/职业）
+const STATIC_CAT = {country:'国家', month:'月', week:'周', animal:'动物', food:'食物', job:'职业'};
 async function loadVocabStatic(key){
   const el=document.getElementById('tool'+key.charAt(0).toUpperCase()+key.slice(1));
   el.innerHTML='<div class="ess-loading"><div class="mini-spin"></div> 加载中…</div>';
