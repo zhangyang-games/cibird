@@ -490,10 +490,7 @@ async def get_stats(token: str = Depends(verify_token)):
         rows = conn.execute("SELECT date_str, count FROM punch_cards ORDER BY date_str DESC LIMIT 100").fetchall()
         return {r[0]: r[1] for r in rows}
 
-if __name__ == "__main__":
-    import uvicorn
-    init_db()
-    uvicorn.run(app, host="0.0.0.0", port=8848)
+
 
 # ── 补全缺失接口 ──────────────────────────────────────────────
 
@@ -562,3 +559,8 @@ async def daily_quote(token: str = Depends(verify_token)):
         if isinstance(ex, str):
             return {"word": w["word"], "sentence_en": ex, "sentence_zh": "", "date": today}
         return {"word": w["word"], "sentence_en": ex.get("en",""), "sentence_zh": ex.get("zh",""), "date": today}
+
+if __name__ == "__main__":
+    import uvicorn
+    init_db()
+    uvicorn.run(app, host="0.0.0.0", port=8848)
