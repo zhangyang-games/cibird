@@ -94,7 +94,7 @@ download_files() {
     step "2/6" "下载 CiBird 项目文件"
     mkdir -p "$INSTALL_DIR"
 
-    for f in server.py index.html; do
+    for f in server.py index.html Cibird.png; do
         info "下载 $f ..."
         curl -fsSL "$REPO_RAW/$f" -o "$INSTALL_DIR/$f" \
             || err "下载 $f 失败，请检查网络或 GitHub 地址"
